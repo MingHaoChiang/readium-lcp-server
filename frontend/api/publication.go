@@ -14,6 +14,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/readium/readium-lcp-server/api"
@@ -148,7 +149,7 @@ func CheckPublicationByTitle(w http.ResponseWriter, r *http.Request, s IServer) 
 //DecodeJSONPublication transforms a json string to a User struct
 func DecodeJSONPublication(r *http.Request) (webpublication.Publication, error) {
 	var dec *json.Decoder
-	if ctype := r.Header["Content-Type"]; len(ctype) > 0 && ctype[0] == api.ContentType_JSON {
+	if ctype := r.Header["Content-Type"]; len(ctype) > 0 && strings.HasPrefix(ctype[0], api.ContentType_JSON) {
 		dec = json.NewDecoder(r.Body)
 	}
 	pub := webpublication.Publication{}
@@ -166,13 +167,23 @@ func CreatePublication(w http.ResponseWriter, r *http.Request, s IServer) {
 	}
 
 	// add publication
-	if err := s.PublicationAPI().Add(pub); err != nil {
+	uuid, err := s.PublicationAPI().Add(pub)
+	if err != nil {
 		problem.Error(w, r, problem.Problem{Detail: err.Error()}, http.StatusBadRequest)
 		return
 	}
 
 	// publication added to db
 	w.WriteHeader(http.StatusCreated)
+	var addedpub webpublication.Publication
+	addedpub.UUID = uuid
+	enc := json.NewEncoder(w)
+    if err = enc.Encode(addedpub); err == nil {
+        	w.Header().Set("Content-Type", api.ContentType_JSON)
+	}else{
+		problem.Error(w, r, problem.Problem{Detail: err.Error()}, http.StatusBadRequest)
+		return
+	}
 }
 
 //UploadEPUB creates a new EPUB file

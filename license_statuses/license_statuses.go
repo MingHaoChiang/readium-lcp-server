@@ -100,7 +100,9 @@ func (i dbLicenseStatuses) Add(ls LicenseStatus) error {
 //List gets license statuses which have devices count more than devices limit
 //input parameters: limit - how much license statuses need to get, offset - from what position need to start
 func (i dbLicenseStatuses) List(deviceLimit int64, limit int64, offset int64) func() (LicenseStatus, error) {
-	rows, err := i.list.Query(deviceLimit, limit, offset)
+//	rows, err := i.list.Query(deviceLimit, limit, offset)
+	//for mysql
+	rows, err := i.list.Query(deviceLimit, offset, limit)
 	if err != nil {
 		return func() (LicenseStatus, error) { return LicenseStatus{}, err }
 	}
@@ -201,8 +203,11 @@ func Open(db *sql.DB) (l LicenseStatuses, err error) {
 		return
 	}
 
+//	list, err := db.Prepare(`SELECT status, license_updated, status_updated, device_count, license_ref FROM license_status WHERE device_count >= ?
+//		ORDER BY id DESC LIMIT ? OFFSET ?`)
+	//for mysql
 	list, err := db.Prepare(`SELECT status, license_updated, status_updated, device_count, license_ref FROM license_status WHERE device_count >= ?
-		ORDER BY id DESC LIMIT ? OFFSET ?`)
+		ORDER BY id DESC LIMIT ?,?`)
 
 	getbylicenseid, err := db.Prepare("SELECT * FROM license_status where license_ref = ?")
 

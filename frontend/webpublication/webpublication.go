@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"fmt"
+	"path/filepath"
 
 	"github.com/readium/readium-lcp-server/api"
 	"github.com/readium/readium-lcp-server/config"
@@ -27,7 +28,7 @@ import (
 	"github.com/readium/readium-lcp-server/lcpserver/api"
 	"github.com/satori/go.uuid"
 
-	"github.com/Machiel/slugify"
+//	"github.com/Machiel/slugify"
 )
 
 // Publication status
@@ -45,7 +46,7 @@ var ErrNotFound = errors.New("Publication not found")
 type WebPublication interface {
 	Get(id int64) (Publication, error)
 	GetByUUID(uuid string) (Publication, error)
-	Add(publication Publication) error
+	Add(publication Publication) (string, error)
 	Update(publication Publication) error
 	Delete(id int64) error
 	List(page int, pageNum int) func() (Publication, error)
@@ -119,7 +120,9 @@ func (pubManager PublicationManager) GetByUUID(uuid string) (Publication, error)
 // CheckByTitle checks if the publication exists or not, by its title
 //
 func (pubManager PublicationManager) CheckByTitle(title string) (int64, error) {
-	dbGetByTitle, err := pubManager.db.Prepare("SELECT CASE WHEN EXISTS (SELECT * FROM [publication] WHERE title = ?) THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END")
+//	dbGetByTitle, err := pubManager.db.Prepare("SELECT CASE WHEN EXISTS (SELECT * FROM [publication] WHERE title = ?) THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END")
+	//for mysql
+	dbGetByTitle, err := pubManager.db.Prepare("SELECT CASE WHEN EXISTS (SELECT * FROM publication WHERE title = ?) THEN 1 ELSE 0 END")
 	if err != nil {
 		return -1, err
 	}
@@ -141,9 +144,14 @@ func (pubManager PublicationManager) CheckByTitle(title string) (int64, error) {
 
 // EncryptEPUB encrypts an EPUB File and sends the content to the LCP server
 //
-func EncryptEPUB(inputPath string, pub Publication, pubManager PublicationManager) error {
+func EncryptEPUB(inputPath string, pub Publication, pubManager PublicationManager) (string, error) {
 	// generate a new uuid; this will be the content id in the lcp server
-	contentUUID := uuid.NewV4().String()
+//	contentUUID := uuid.NewV4().String()
+	u, err := uuid.NewV4()
+	contentUUID := u.String()
+	if pub.UUID != "" {
+		contentUUID = pub.UUID
+	}
 	// create a temp file in the frontend "encrypted repository"
 	outputFilename := contentUUID + ".tmp"
 	outputPath := path.Join(pubManager.config.FrontendServer.EncryptedRepository, outputFilename)
@@ -156,11 +164,12 @@ func EncryptEPUB(inputPath string, pub Publication, pubManager PublicationManage
 		if _, err := os.Stat(inputPath); err == nil {
 			os.Remove(inputPath)
 		}
-		return err
+		return "", err
 	}
 
 	// prepare the request for import to the lcp server
-	contentDisposition := slugify.Slugify(pub.Title)
+//	contentDisposition := slugify.Slugify(pub.Title)
+	contentDisposition := filepath.Base(inputPath)
 	lcpPublication := apilcp.LcpPublication{}
 	lcpPublication.ContentId = contentUUID
 	lcpPublication.ContentKey = encryptedEpub.EncryptionKey
@@ -172,7 +181,7 @@ func EncryptEPUB(inputPath string, pub Publication, pubManager PublicationManage
 	// json encode the payload
 	jsonBody, err := json.Marshal(lcpPublication)
 	if err != nil {
-		return err
+		return "", err
 	}
 	// send the content to the LCP server
 	lcpServerConfig := pubManager.config.LcpServer
@@ -180,7 +189,7 @@ func EncryptEPUB(inputPath string, pub Publication, pubManager PublicationManage
 	log.Println("PUT " + lcpURL)
 	req, err := http.NewRequest("PUT", lcpURL, bytes.NewReader(jsonBody))
 	if err != nil {
-		return err
+		return "", err
 	}
 	// authenticate
 	lcpUpdateAuth := pubManager.config.LcpUpdateAuth
@@ -196,18 +205,18 @@ func EncryptEPUB(inputPath string, pub Publication, pubManager PublicationManage
 	// sends a request for import to the lcp server
 	resp, err := lcpClient.Do(req)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	if resp.StatusCode != 201 {
 		// error on creation
-		return err
+		return "", err
 	}
 
 	// remove the temporary file in the "encrypted repository"
 	err = os.Remove(outputPath)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// store the new publication in the db
@@ -216,7 +225,7 @@ func EncryptEPUB(inputPath string, pub Publication, pubManager PublicationManage
 	pub.Status = StatusOk
 	dbAdd, err := pubManager.db.Prepare("INSERT INTO publication (uuid, title, status) VALUES ( ?, ?, ?)")
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer dbAdd.Close()
 
@@ -224,25 +233,25 @@ func EncryptEPUB(inputPath string, pub Publication, pubManager PublicationManage
 		pub.UUID,
 		pub.Title,
 		pub.Status)
-	return err
+	return contentUUID, err
 }
 
 // Add adds a new publication
 // Encrypts a master File and sends the content to the LCP server
 //
-func (pubManager PublicationManager) Add(pub Publication) error {
+func (pubManager PublicationManager) Add(pub Publication) (string, error) {
 	// get the path to the master file
 	inputPath := path.Join(
 		pubManager.config.FrontendServer.MasterRepository, pub.MasterFilename)
 
 	if _, err := os.Stat(inputPath); err != nil {
 		// the master file does not exist
-		return err
+		return "", err
 	}
 	// encrypt the EPUB File and send the content to the LCP server
-	err := EncryptEPUB(inputPath, pub, pubManager)
+	uuid, err := EncryptEPUB(inputPath, pub, pubManager)
 
-	return err
+	return uuid, err
 }
 
 // UploadEPUB creates a new EPUB file, namd after a file form parameter.
@@ -267,7 +276,7 @@ func (pubManager PublicationManager) UploadEPUB(r *http.Request, w http.Response
 		log.Fatal(err)
 	}
 	// encrypt the EPUB File and send the content to the LCP server
-	if err := EncryptEPUB(tmpfile.Name(), pub, pubManager); err != nil {
+	if _, err := EncryptEPUB(tmpfile.Name(), pub, pubManager); err != nil {
 		log.Fatal(err)
 	}
 
@@ -358,12 +367,16 @@ func (pubManager PublicationManager) Delete(id int64) error {
 // Parameters: page = number of items per page; pageNum = page offset (0 for the first page)
 //
 func (pubManager PublicationManager) List(page int, pageNum int) func() (Publication, error) {
-	dbList, err := pubManager.db.Prepare("SELECT id, uuid, title, status FROM publication ORDER BY title desc LIMIT ? OFFSET ?")
+//	dbList, err := pubManager.db.Prepare("SELECT id, uuid, title, status FROM publication ORDER BY title desc LIMIT ? OFFSET ?")
+	//for mysql
+	dbList, err := pubManager.db.Prepare("SELECT id, uuid, title, status FROM publication ORDER BY title desc LIMIT ?,?")
 	if err != nil {
 		return func() (Publication, error) { return Publication{}, err }
 	}
 	defer dbList.Close()
-	records, err := dbList.Query(page, pageNum*page)
+//	records, err := dbList.Query(page, pageNum*page)
+	//for mysql
+	records, err := dbList.Query(pageNum*page, page)
 	if err != nil {
 		return func() (Publication, error) { return Publication{}, err }
 	}

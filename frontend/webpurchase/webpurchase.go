@@ -427,7 +427,9 @@ func (pManager PurchaseManager) GetByLicenseID(licenseID string) (Purchase, erro
 // List purchases, with pagination
 //
 func (pManager PurchaseManager) List(page int, pageNum int) func() (Purchase, error) {
-	dbListByUserQuery := purchaseManagerQuery + ` ORDER BY p.transaction_date desc LIMIT ? OFFSET ?`
+//	dbListByUserQuery := purchaseManagerQuery + ` ORDER BY p.transaction_date desc LIMIT ? OFFSET ?`
+	//for mysql
+	dbListByUserQuery := purchaseManagerQuery + ` ORDER BY p.transaction_date desc LIMIT ?,?`
 	dbListByUser, err := pManager.db.Prepare(dbListByUserQuery)
 
 	if err != nil {
@@ -435,22 +437,27 @@ func (pManager PurchaseManager) List(page int, pageNum int) func() (Purchase, er
 	}
 	defer dbListByUser.Close()
 
-	records, err := dbListByUser.Query(page, pageNum*page)
+//	records, err := dbListByUser.Query(page, pageNum*page)
+	//for mysql
+	records, err := dbListByUser.Query(pageNum*page, page)
 	return convertRecordsToPurchases(records)
 }
 
 // ListByUser: list the purchases of a given user, with pagination
 //
 func (pManager PurchaseManager) ListByUser(userID int64, page int, pageNum int) func() (Purchase, error) {
+//	dbListByUserQuery := purchaseManagerQuery + ` WHERE u.id = ?
+//ORDER BY p.transaction_date desc LIMIT ? OFFSET ?`
+	//for mysql
 	dbListByUserQuery := purchaseManagerQuery + ` WHERE u.id = ?
-ORDER BY p.transaction_date desc LIMIT ? OFFSET ?`
+ORDER BY p.transaction_date desc LIMIT ?,?`
 	dbListByUser, err := pManager.db.Prepare(dbListByUserQuery)
 	if err != nil {
 		return func() (Purchase, error) { return Purchase{}, err }
 	}
 	defer dbListByUser.Close()
 
-	records, err := dbListByUser.Query(userID, page, pageNum*page)
+	records, err := dbListByUser.Query(userID, pageNum*page, page)
 	return convertRecordsToPurchases(records)
 }
 
@@ -477,7 +484,11 @@ func (pManager PurchaseManager) Add(p Purchase) error {
 	}
 
 	// Create uuid
-	p.UUID = uuid.NewV4().String()
+	u, err := uuid.NewV4()
+	p.UUID = u.String()
+	if err != nil {
+	    return err
+	}
 
 	_, err = add.Exec(
 		p.UUID,
@@ -608,3 +619,4 @@ const tableDef = "CREATE TABLE IF NOT EXISTS purchase (" +
 	"FOREIGN KEY (user_id) REFERENCES user(id)" +
 	");" +
 	"CREATE INDEX IF NOT EXISTS idx_purchase ON purchase (license_uuid)"
+
