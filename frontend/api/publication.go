@@ -15,7 +15,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"fmt"
 
 	"github.com/gorilla/mux"
 	"github.com/readium/readium-lcp-server/api"
@@ -248,3 +247,4 @@ func DeletePublication(w http.ResponseWriter, r *http.Request, s IServer) {
 	// publication deleted from db
 	w.WriteHeader(http.StatusOK)
 }
+
