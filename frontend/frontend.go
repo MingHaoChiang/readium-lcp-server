@@ -49,6 +49,8 @@ import (
 	"github.com/readium/readium-lcp-server/frontend/webpurchase"
 	"github.com/readium/readium-lcp-server/frontend/webrepository"
 	"github.com/readium/readium-lcp-server/frontend/webuser"
+	
+	metrics "github.com/tevjef/go-runtime-metrics"
 )
 
 func dbFromURI(uri string) (string, string) {
@@ -57,8 +59,14 @@ func dbFromURI(uri string) (string, string) {
 }
 
 func main() {
+	metricsConfig :=  metrics.DefaultConfig
+	metricsConfig.Database = "frontendStats"
+	err := metrics.RunCollector(metricsConfig)
+	if err != nil {
+	   fmt.Println("metrics error:", err)
+	}
 	var dbURI, static, configFile string
-	var err error
+	//var err error
 
 	if configFile = os.Getenv("READIUM_FRONTEND_CONFIG"); configFile == "" {
 		configFile = "config.yaml"
@@ -83,11 +91,14 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	_, err = db.Exec("PRAGMA journal_mode = WAL")
-	if err != nil {
-		panic(err)
+	
+	if driver == "sqlite3" {
+		_, err = db.Exec("PRAGMA journal_mode = WAL")
+		if err != nil {
+			panic(err)
+		}
 	}
-
+	db.SetMaxIdleConns(0)
 	repoManager, err := webrepository.Init(config.Config.FrontendServer)
 	if err != nil {
 		panic(err)

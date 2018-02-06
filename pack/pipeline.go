@@ -117,7 +117,13 @@ func (p Packager) genKey(r *Result) {
 		return
 	}
 
-	r.Id = uuid.NewV4().String()
+//	r.Id = uuid.NewV4().String()
+	id, err := uuid.NewV4()
+	r.Id = id.String()
+	if err != nil {
+		r.Error = err
+		return
+	}
 }
 
 func (p Packager) readZip(r *Result, in io.ReaderAt, size int64) *zip.Reader {

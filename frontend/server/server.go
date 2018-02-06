@@ -34,7 +34,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/claudiu/gocron"
+//	"github.com/claudiu/gocron"
 	"github.com/gorilla/mux"
 	"github.com/readium/readium-lcp-server/api"
 	"github.com/readium/readium-lcp-server/config"
@@ -93,8 +93,8 @@ func New(
 		purchases:    purchaseAPI}
 
 	// Cron, get license status information
-	gocron.Start()
-	gocron.Every(10).Minutes().Do(fetchLicenseStatusesTask, s)
+//	gocron.Start()
+//	gocron.Every(10).Minutes().Do(fetchLicenseStatusesTask, s)
 
 	apiURLPrefix := "/api/v1"
 

@@ -49,6 +49,7 @@ import (
 	"github.com/readium/readium-lcp-server/license"
 	"github.com/readium/readium-lcp-server/pack"
 	"github.com/readium/readium-lcp-server/storage"
+	metrics "github.com/tevjef/go-runtime-metrics"
 )
 
 func dbFromURI(uri string) (string, string) {
@@ -57,9 +58,15 @@ func dbFromURI(uri string) (string, string) {
 }
 
 func main() {
+	metricsConfig :=  metrics.DefaultConfig
+	metricsConfig.Database = "lcpserverStats"
+	err := metrics.RunCollector(metricsConfig)
+	if err != nil {
+		fmt.Println("metrics error:", err)
+	}
 	var config_file, dbURI, storagePath, certFile, privKeyFile, static string
 	var readonly bool = false
-	var err error
+//	var err error
 
 	if config_file = os.Getenv("READIUM_LCPSERVER_CONFIG"); config_file == "" {
 		config_file = "config.yaml"
@@ -132,6 +139,7 @@ func main() {
 			panic(err)
 		}
 	}
+	db.SetMaxIdleConns(0)
 	idx, err := index.Open(db)
 	if err != nil {
 		panic(err)

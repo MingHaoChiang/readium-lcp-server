@@ -36,10 +36,15 @@ type sqlStore struct {
 // pageNum starts at 0
 //
 func (s *sqlStore) ListAll(page int, pageNum int) func() (LicenseReport, error) {
+//	listLicenses, err := s.db.Query(`SELECT id, user_id, provider, issued, updated,
+//	rights_print, rights_copy, rights_start, rights_end, content_fk
+//	FROM license
+//	ORDER BY issued desc LIMIT ? OFFSET ? `, page, pageNum*page)
+	//for mysql
 	listLicenses, err := s.db.Query(`SELECT id, user_id, provider, issued, updated,
 	rights_print, rights_copy, rights_start, rights_end, content_fk
 	FROM license
-	ORDER BY issued desc LIMIT ? OFFSET ? `, page, pageNum*page)
+	ORDER BY issued desc LIMIT ?,? `, pageNum*page, page)
 	if err != nil {
 		return func() (LicenseReport, error) { return LicenseReport{}, err }
 	}
@@ -70,7 +75,7 @@ func (s *sqlStore) List(contentID string, page int, pageNum int) func() (License
 	listLicenses, err := s.db.Query(`SELECT id, user_id, provider, issued, updated,
 	rights_print, rights_copy, rights_start, rights_end, content_fk
 	FROM license
-	WHERE content_fk=? LIMIT ? OFFSET ? `, contentID, page, pageNum*page)
+	WHERE content_fk=? LIMIT ?,? `, contentID, pageNum*page, page)
 	if err != nil {
 		return func() (LicenseReport, error) { return LicenseReport{}, err }
 	}

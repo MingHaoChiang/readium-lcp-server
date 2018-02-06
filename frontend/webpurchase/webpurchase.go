@@ -427,7 +427,9 @@ func (pManager PurchaseManager) GetByLicenseID(licenseID string) (Purchase, erro
 // List purchases, with pagination
 //
 func (pManager PurchaseManager) List(page int, pageNum int) func() (Purchase, error) {
-	dbListByUserQuery := purchaseManagerQuery + ` ORDER BY p.transaction_date desc LIMIT ? OFFSET ?`
+//	dbListByUserQuery := purchaseManagerQuery + ` ORDER BY p.transaction_date desc LIMIT ? OFFSET ?`
+	//for mysql
+	dbListByUserQuery := purchaseManagerQuery + ` ORDER BY p.transaction_date desc LIMIT ?,?`
 	dbListByUser, err := pManager.db.Prepare(dbListByUserQuery)
 
 	if err != nil {
@@ -435,7 +437,9 @@ func (pManager PurchaseManager) List(page int, pageNum int) func() (Purchase, er
 	}
 	defer dbListByUser.Close()
 
-	records, err := dbListByUser.Query(page, pageNum*page)
+//	records, err := dbListByUser.Query(page, pageNum*page)
+	//for mysql
+	records, err := dbListByUser.Query(userID, pageNum*page, page)
 	return convertRecordsToPurchases(records)
 }
 
@@ -477,7 +481,11 @@ func (pManager PurchaseManager) Add(p Purchase) error {
 	}
 
 	// Create uuid
-	p.UUID = uuid.NewV4().String()
+	u, err := uuid.NewV4()
+	p.UUID = u.String()
+	if err != nil {
+	    return err
+	}
 
 	_, err = add.Exec(
 		p.UUID,

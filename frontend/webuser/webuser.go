@@ -96,7 +96,11 @@ func (user dbUser) Add(newUser User) error {
 	defer add.Close()
 
 	// Create uuid
-	newUser.UUID = uuid.NewV4().String()
+	u, err := uuid.NewV4()
+	newUser.UUID = u.String()
+	if err != nil {
+		return err
+	}
 
 	_, err = add.Exec(newUser.UUID, newUser.Name, newUser.Email, newUser.Password, newUser.Hint)
 	return err
@@ -133,9 +137,14 @@ func (user dbUser) DeleteUser(userID int64) error {
 }
 
 func (user dbUser) ListUsers(page int, pageNum int) func() (User, error) {
+//	listUsers, err := user.db.Query(`SELECT id, uuid, name, email, password, hint
+//	FROM user
+//	ORDER BY email desc LIMIT ? OFFSET ? `, page, pageNum*page)
+	//for mysql
 	listUsers, err := user.db.Query(`SELECT id, uuid, name, email, password, hint
 	FROM user
-	ORDER BY email desc LIMIT ? OFFSET ? `, page, pageNum*page)
+	ORDER BY email desc LIMIT ?,? `, pageNum*page, page)
+	
 	if err != nil {
 		return func() (User, error) { return User{}, err }
 	}

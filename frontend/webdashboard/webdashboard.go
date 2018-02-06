@@ -123,7 +123,9 @@ func (dashManager DashboardManager) GetDashboardInfos() (Dashboard, error) {
 		records.Close()
 	}
 
-	dbGet, err = dashManager.db.Prepare(`SELECT ROUND(AVG(julianday(end_date) - julianday(start_date))) FROM purchase WHERE type="LOAN"`)
+//	dbGet, err = dashManager.db.Prepare(`SELECT ROUND(AVG(julianday(end_date) - julianday(start_date))) FROM purchase WHERE type="LOAN"`)
+	//for mysql
+	dbGet, err = dashManager.db.Prepare(`SELECT ROUND(AVG(TIMESTAMPDIFF(DAY, start_date, end_date))) FROM purchase WHERE type="LOAN"`)
 	if err != nil {
 		return Dashboard{}, err
 	}
@@ -142,7 +144,7 @@ func (dashManager DashboardManager) GetDashboardInfos() (Dashboard, error) {
 func (dashManager DashboardManager) GetDashboardBestSellers() ([5]BestSeller, error) {
 	dbList, err := dashManager.db.Prepare(
 		`SELECT pub.title, count(pub.id)
-  		FROM [purchase] pur JOIN publication pub 
+  		FROM purchase pur JOIN publication pub 
     	ON pur.publication_id = pub.id
  		GROUP BY pub.id
  		ORDER BY  Count(pur.id) DESC limit 5`)
